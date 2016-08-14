@@ -133,7 +133,7 @@ checkLinuxLogglyCompatibility()
 
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
-	
+
 	#update rsyslog.conf and adds $MaxMessageSize in it
 	modifyMaxMessageSize
 
@@ -325,14 +325,16 @@ checkIfLogglyServersAccessible()
 #check if user name and password is valid
 checkIfValidUserNamePassword()
 {
-	echo "INFO: Checking if provided username and password is correct."
-	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
-			logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
-			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. Your username is visible at the top right of the Loggly console before the @ symbol. You can reset your password at http://<subdomain>.loggly.com/login."
-			exit 1
-	else
-		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
-	fi
+  if [ "$LOGGLY_AUTH_TOKEN" = "" ]; then
+  	echo "INFO: Checking if provided username and password is correct."
+  	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
+  			logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+  			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. Your username is visible at the top right of the Loggly console before the @ symbol. You can reset your password at http://<subdomain>.loggly.com/login."
+  			exit 1
+  	else
+  		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
+  	fi
+  fi
 }
 
 getAuthToken()
@@ -360,13 +362,15 @@ getAuthToken()
 #check if authentication token is valid
 checkIfValidAuthToken()
 {
-	echo "INFO: Checking if provided auth token is correct."
-	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep \"$LOGGLY_AUTH_TOKEN\" | wc -l) == 1 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Authentication token validated successfully."
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid authentication token $LOGGLY_AUTH_TOKEN. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
-		exit 1
-	fi
+  if [ "$LOGGLY_USERNAME" != "" ]; then
+  	echo "INFO: Checking if provided auth token is correct."
+  	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep \"$LOGGLY_AUTH_TOKEN\" | wc -l) == 1 ]; then
+  		logMsgToConfigSysLog "INFO" "INFO: Authentication token validated successfully."
+  	else
+  		logMsgToConfigSysLog "ERROR" "ERROR: Invalid authentication token $LOGGLY_AUTH_TOKEN. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
+  		exit 1
+  	fi
+  fi
 }
 
 #check if rsyslog is configured as service. If it is configured as service and not started, start the service
@@ -407,7 +411,7 @@ checkIfSystemdConfigured()
 		cp /etc/systemd/journald.conf /etc/systemd/journald.conf.loggly.bk
 		sed -i 's/.*ForwardToSyslog.*/ForwardToSyslog=Yes/g' /etc/systemd/journald.conf
 		logMsgToConfigSysLog "INFO" "INFO: Restarting Systemd-journald"
-		systemctl restart systemd-journald 
+		systemctl restart systemd-journald
 	fi
 }
 
@@ -806,6 +810,8 @@ if [ "$1" != "being-invoked" ]; then
 
 	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
 		removeLogglyConf
+  elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_AUTH_TOKEN" != ""  ]; then
+    installLogglyConf
 	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
